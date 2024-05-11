@@ -199,19 +199,25 @@ class ResourceProtocol(WebSocketServerProtocol):
 
 loop = asyncio.get_event_loop()
 
-server =  Server(port=9001, useSsl=True, sslCert="server.crt", sslKey="server.key")
+server =  Server(port=9001, useSsl=True, sslCert="fullchain.pem", sslKey="privkey.pem")
+
+import socket
+sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+
 
 def onTextMessage(msg, client):
-	print("got message from client:", msg)
+        print("got message from client:", msg)
+        # send UDP
+        sock.sendto(msg, ('192.168.207.183',12345))
+        
 
 def onBinaryMessage(msg, client):
-	print("got binary message")
+	print("got binary message",len(msg))
 
 server.setTextHandler(onTextMessage)
 server.setBinaryHandler(onBinaryMessage)
 
 
-@asyncio.coroutine
 def sendData():
 	while True:
 		try:
