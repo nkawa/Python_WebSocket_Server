@@ -206,6 +206,30 @@ class ResourceProtocol(WebSocketServerProtocol):
 client_id = f'python_mqtt{random.randint(0,1000)}'
 print("client_id",client_id)
 
+FIRST_RECONNECT_DELAY = 1
+RECONNECT_RATE = 2
+MAX_RECONNECT_COUNT = 12
+MAX_RECONNECT_DELAY = 60
+
+def on_disconnect(client, userdata, rc):
+    logging.info("切断されました、結果コード: %s", rc)
+    reconnect_count, reconnect_delay = 0, FIRST_RECONNECT_DELAY
+    while reconnect_count < MAX_RECONNECT_COUNT:
+        logging.info("%d秒後に再接続します...", reconnect_delay)
+        time.sleep(reconnect_delay)
+
+        try:
+            client.reconnect()
+            logging.info("再接続に成功しました！")
+            return
+        except Exception as err:
+            logging.error("%s。再接続に失敗しました。再試行します...", err)
+
+        reconnect_delay *= RECONNECT_RATE
+        reconnect_delay = min(reconnect_delay, MAX_RECONNECT_DELAY)
+        reconnect_count += 1
+    logging.info("%s回の試行後に再接続に失敗しました。終了します...", reconnect_count)
+
 def connect_mqtt(cid):
 	def on_connect(client, userdata, flags, rc):
 		if rc==0:
@@ -215,6 +239,7 @@ def connect_mqtt(cid):
 
 	client = mqtt_client.Client(mqtt_client.CallbackAPIVersion.VERSION1,cid)
 	client.on_connect = on_connect
+	client.on_disconnect = on_disconnect
 	client.connect("sora2.uclab.jp",1883)
 	return client
 
@@ -231,9 +256,9 @@ msgct  =0
 
 def onTextMessage(msg, client):
 	global msgct
-	if msgct% 100== 0:	
+	if msgct% 1000== 0:	
 		now = datetime.datetime.now()
-		print(now,msgct/100,msg)
+		print(now,msgct/1000,msg)
 	msgct+=1
 	mqclt.publish('webxr/pose', msg)
 
