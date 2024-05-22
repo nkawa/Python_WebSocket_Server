@@ -4,6 +4,15 @@ from autobahn.asyncio.websocket import WebSocketServerProtocol, WebSocketServerF
 import sys
 import traceback
 import ssl
+import random
+from paho.mqtt import client as mqtt_client
+import datetime
+
+
+"""
+ WebSocket で受け取って MQTTに変換するだけ
+
+"""
 
 class DebugPrinter:
 	def __init__(self, debug = False):
@@ -194,23 +203,43 @@ class ResourceProtocol(WebSocketServerProtocol):
                           limit=2, file=sys.stdout)
 
 
+client_id = f'python_mqtt{random.randint(0,1000)}'
+print("client_id",client_id)
 
+def connect_mqtt(cid):
+	def on_connect(client, userdata, flags, rc):
+		if rc==0:
+			print("Connected to MQTT broker")
+		else:
+			print("MQTT Connection failed! %d\n",rc)
+
+	client = mqtt_client.Client(mqtt_client.CallbackAPIVersion.VERSION1,cid)
+	client.on_connect = on_connect
+	client.connect("sora2.uclab.jp",1883)
+	return client
 
 
 loop = asyncio.get_event_loop()
 
 server =  Server(port=9001, useSsl=True, sslCert="fullchain.pem", sslKey="privkey.pem")
 
-import socket
-sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+#import socket
+#sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 
+mqclt = connect_mqtt(client_id)
+msgct  =0
 
 def onTextMessage(msg, client):
-        print("got message from client:", msg)
-        # send UDP
-        sock.sendto(msg, ('192.168.207.183',12345))
-        
+	global msgct
+	if msgct% 100== 0:	
+		now = datetime.datetime.now()
+		print(now,msgct/100,msg)
+	msgct+=1
+	mqclt.publish('webxr/pose', msg)
 
+
+# sock.sendto(msg, ('192.168.207.183',12345))
+        
 def onBinaryMessage(msg, client):
 	print("got binary message",len(msg))
 
