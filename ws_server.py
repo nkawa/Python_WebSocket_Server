@@ -7,6 +7,9 @@ import ssl
 import random
 from paho.mqtt import client as mqtt_client
 import datetime
+import logging
+import time
+import json
 
 
 """
@@ -24,10 +27,17 @@ class DebugPrinter:
 
 class Client:
 	def __init__(self, handle):
+		global client_count
 		self.handle = handle
 		self.closeHandler = None
+		client_count += 1
 
 	def close(self):
+		global client_count
+		global main_client
+		if main_client == self:
+			main_client = None
+			client_count -= 1
 		try:
 			self.handle.sendClose(code=WebSocketClientProtocol.CLOSE_STATUS_CODE_NORMAL)
 		except:
@@ -254,12 +264,29 @@ server =  Server(port=9001, useSsl=True, sslCert="fullchain.pem", sslKey="privke
 mqclt = connect_mqtt(client_id)
 msgct  =0
 
+client_count = 0
+main_client = None 
+
 def onTextMessage(msg, client):
 	global msgct
-	if msgct% 1000== 0:	
+	global main_client
+	
+	js = json.loads(msg)
+	if 'host' in js:
+		print(js)
+	
+#	if main_client == None:
+#		main_client = client	
+#	elif main_client == client:
+#		return
+
+	if msgct% 100== 0:	
 		now = datetime.datetime.now()
 		print(now,msgct/1000,msg)
+	elif msgct % 30 == 0:
+		print(".",end="",flush=True)
 	msgct+=1
+    # need to change for each devices.
 	mqclt.publish('webxr/pose', msg)
 
 
@@ -271,11 +298,11 @@ def onBinaryMessage(msg, client):
 server.setTextHandler(onTextMessage)
 server.setBinaryHandler(onBinaryMessage)
 
-
 def sendData():
 	while True:
 		try:
 			print("trying to broadcast...")
+
 			server.broadcast("{'hello' : 'world'# }")
 		except:
 			exc_type, exc_value, exc_traceback = sys.exc_info()
